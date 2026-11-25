@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="Mapa das estações do INMET com pelo menos 10 anos seguidos de chuva e temperatura, com climograma, tendência e recordes.">
+  <title>Atlas Climático</title>
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" integrity="sha384-MinO0mNliZ3vwppuPOUnGa+iq619pfMhLVUXfC4LHwSCvF9H+6P/KO4Q7qBOYV5V" crossorigin="anonymous">
+  <link rel="stylesheet" href="style.css?v=61">
+  <script defer src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js" integrity="sha384-SYKAG6cglRMN0RVvhNeBY0r3FYKNOJtznwA0v7B5Vp9tr31xAHsZC0DqkQ/pZDmj" crossorigin="anonymous"></script>
+  <script defer src="app.js?v=45"></script>
+</head>
+<body>
+  <a class="pular" href="#conteudo">Ir para o conteúdo</a>
+
+  <header class="topo">
+    <a class="marca" href="#/">
+      <h1><svg class="glifo" width="26" height="22" viewBox="2 0 30 26" aria-hidden="true">
+        <rect x="2" y="14" width="5" height="12" fill="#1b5e96"/><rect x="9" y="6" width="5" height="20" fill="#1b5e96"/>
+        <rect x="16" y="10" width="5" height="16" fill="#1b5e96"/><rect x="23" y="18" width="5" height="8" fill="#1b5e96"/>
+        <polyline points="4.5,12 11.5,7 18.5,9 25.5,4 31,6" fill="none" stroke="#b1440f" stroke-width="2.5" stroke-linejoin="round"/>
+      </svg>Atlas Climático</h1>
+    </a>
+    <nav class="indice" aria-label="Seções da página">
+      <a href="#/">Atlas</a>
+      <a href="#sobre">Sobre os dados</a>
+      <a href="#projeto">Sobre o projeto</a>
+    </nav>
+    <img class="topo-logo" src="img/ftl-marca.png" alt="Future Tech Leaders">
+  </header>
+
+  <main id="conteudo" tabindex="-1">
+    <div id="vista-lista" class="vista-lista">
+      <section class="mapa-bloco" aria-labelledby="mapa-titulo">
+        <h2 id="mapa-titulo" class="sr-only">Mapa</h2>
+        <div class="mapa-barra">
+          <div class="legenda">
+            <p id="leg-t" class="leg-titulo">Maior série contínua</p>
+            <ul id="leg-classes" class="leg-lista" aria-labelledby="leg-t"></ul>
+            <span class="anel-leg"><svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><circle cx="13" cy="13" r="10" fill="none" stroke="#12212b" stroke-width="1.5"/><circle cx="13" cy="13" r="6.5" fill="#7a2e8e" stroke="#12212b"/></svg> Mais de uma série</span>
+          </div>
+        </div>
+        <div id="map" role="region" aria-label="Mapa das estações. A lista ao lado tem as mesmas estações e funciona pelo teclado."></div>
+      </section>
+
+      <section class="lista-bloco" aria-labelledby="lista-titulo">
+        <h2 id="lista-titulo">Séries</h2>
+        <div class="filtros">
+          <div class="campo campo-largo">
+            <label for="busca">Buscar por nome ou código</label>
+            <input id="busca" type="search" autocomplete="off" spellcheck="false">
+          </div>
+          <div class="campo">
+            <label for="rede">Tipo de estação</label>
+            <select id="rede">
+              <option value="todas">Todas</option>
+              <option value="automatica">Automáticas</option>
+              <option value="convencional">Convencionais</option>
+            </select>
+          </div>
+          <div class="campo">
+            <label for="ordem">Ordenar por</label>
+            <select id="ordem">
+              <option value="nome">Nome</option>
+              <option value="anos">Mais anos de série</option>
+              <option value="chuva">Mais chuva</option>
+              <option value="temperatura">Mais quente</option>
+            </select>
+          </div>
+        </div>
+        <p id="resumo" class="resumo" role="status">Carregando estações…</p>
+        <button id="limpar" type="button" class="botao" hidden>Limpar busca e filtros</button>
+        <div id="erro" class="erro" role="alert" hidden>
+          <p id="erro-texto"></p>
+          <button id="tentar" type="button" class="botao">Tentar de novo</button>
+        </div>
+        <ul id="lista" class="lista">
+          <li class="esqueleto" aria-hidden="true"><span></span><span></span><span></span></li>
+          <li class="esqueleto" aria-hidden="true"><span></span><span></span><span></span></li>
+          <li class="esqueleto" aria-hidden="true"><span></span><span></span><span></span></li>
+          <li class="esqueleto" aria-hidden="true"><span></span><span></span><span></span></li>
+          <li class="esqueleto" aria-hidden="true"><span></span><span></span><span></span></li>
+        </ul>
+      </section>
+    </div>
+
+    <article id="vista-estacao" class="estacao" aria-labelledby="est-titulo" hidden>
+      <a id="voltar" class="voltar" href="#/">Voltar ao mapa</a>
+      <header class="est-cab">
+        <h2 id="est-titulo" tabindex="-1"></h2>
+        <p id="est-sub" class="est-sub"></p>
+      </header>
+      <dl id="est-fatos" class="fatos"></dl>
+      <p id="est-aviso" class="aviso" hidden></p>
+
+      <section class="bloco" aria-labelledby="clima-t">
+        <h3 id="clima-t">Clima ao longo do ano</h3>
+        <p class="nota">Barras azuis: chuva média de cada mês. Linha laranja: temperatura média.</p>
+        <div id="clima-svg" class="grafico"></div>
+        <details>
+          <summary>Ver os valores do climograma em tabela</summary>
+          <div id="clima-tab" class="rolagem" role="region" aria-label="Valores do climograma" tabindex="0"></div>
+        </details>
+      </section>
+
+      <section class="bloco" aria-labelledby="tend-t">
+        <h3 id="tend-t">Tendência ano a ano</h3>
+        <p class="nota">Só entram anos completos. A linha tracejada é a tendência ajustada aos dados.</p>
+        <div id="tendencia" class="duplo"></div>
+        <details>
+          <summary>Ver os valores anuais em tabela</summary>
+          <div id="tend-tab" class="rolagem" role="region" aria-label="Valores anuais" tabindex="0"></div>
+        </details>
+      </section>
+
+      <section class="bloco" aria-labelledby="rec-t">
+        <div class="rec-topo">
+          <h3 id="rec-t">Recordes</h3>
+          <fieldset class="segmentos">
+            <legend>Agrupar por</legend>
+            <div class="seg-grupo" id="rec-grupo">
+              <label class="seg"><input type="radio" name="rec" value="geral" checked><span>Geral</span></label>
+              <label class="seg"><input type="radio" name="rec" value="dia"><span>Dia do ano</span></label>
+              <label class="seg"><input type="radio" name="rec" value="mes"><span>Mês</span></label>
+              <label class="seg"><input type="radio" name="rec" value="ano"><span>Ano</span></label>
+            </div>
+          </fieldset>
+        </div>
+        <p id="rec-erro" class="erro" role="alert"></p>
+        <div class="duplo">
+          <div>
+            <h4 id="rec-janela-titulo"></h4>
+            <div id="rec-janela" class="rolagem" role="region" aria-labelledby="rec-janela-titulo" tabindex="0"></div>
+          </div>
+          <div>
+            <h4 id="rec-completa-titulo">Histórico completo da estação</h4>
+            <div id="rec-completa" class="rolagem" role="region" aria-labelledby="rec-completa-titulo" tabindex="0"></div>
+          </div>
+        </div>
+      </section>
+    </article>
+  </main>
+
+  <section class="sobre" id="sobre" aria-labelledby="sobre-t">
+    <div class="sobre-grade">
+      <div class="sobre-principal">
+        <div class="sobre-intro">
+          <h2 id="sobre-t">Sobre os dados</h2>
+          <p class="lead">Este atlas mostra onde o Brasil tem séries longas e completas de chuva e temperatura. Cada ponto é uma estação do INMET com pelo menos 10 anos seguidos das duas variáveis, medidas ou estimadas.</p>
+          <p>Séries assim são a base para medir mudança no clima. Sem elas, não dá para saber se uma região ficou mais quente ou mais seca, nem para apoiar estudos ambientais, hidrológicos e agrícolas.</p>
+          <p id="sobre-total" class="sobre-total" hidden></p>
+        </div>
+
+        <section class="sobre-metodo" aria-labelledby="s-metodo">
+          <h3 id="s-metodo">Como as séries são montadas</h3>
+          <ol class="passos">
+            <li><strong>Série.</strong> Período contínuo de 10 anos ou mais em que a estação mediu chuva e temperatura. Uma estação pode ter mais de uma.</li>
+            <li><strong>Falhas.</strong> Lacunas de até 30 dias seguidos podem ser preenchidas por um modelo de aprendizado de máquina, descrito abaixo. Lacunas maiores ficam sem estimativa.</li>
+            <li><strong>Resultado.</strong> Cada série informa a parcela de dias estimados. Médias, climograma, tendência e recordes mensais e anuais usam dias medidos e estimados. Os recordes diários usam só dias medidos.</li>
+          </ol>
+        </section>
+
+        <section class="sobre-metodo sobre-cuidado" aria-labelledby="s-limites">
+          <h3 id="s-limites">Antes de usar</h3>
+          <ul class="sobre-lista">
+            <li>Dias estimados não são medições. Onde a parcela estimada for alta, trate as médias com cautela.</li>
+            <li>O desempenho apresentado é otimista. O período de teste também entrou na decisão de aprovar cada estação. Uma validação independente precisa de dados novos, como os de 2026.</li>
+            <li>Nas estações automáticas, a temperatura é a média diária, e não a média compensada das convencionais. Não se demonstrou que as duas redes são equivalentes.</li>
+            <li>A classificação de Köppen é indicativa. Estações na divisa entre duas classes mostram as alternativas.</li>
+            <li>O atlas não tem vínculo oficial com o INMET. Para decisões técnicas ou legais, confira os dados originais.</li>
+          </ul>
+        </section>
+
+        <details class="sobre-topico">
+          <summary><h3 id="s-ml">Dias estimados por aprendizado de máquina</h3></summary>
+          <div class="sobre-topico-corpo">
+          <p>O modelo não usa a própria estação no dia que falta. Ele aprende com as estações vizinhas da mesma rede e com o calendário, e só entra em uso depois de provar que acerta em dias medidos escondidos dele.</p>
+          <ol class="sobre-lista">
+            <li><strong>Vizinhos.</strong> Para cada dia, o modelo recebe o que até 5 estações da mesma rede, a no máximo 100 km, mediram naquele dia. Recebe também a média delas nos dias anterior e seguinte, a época do ano, latitude, longitude e altitude.</li>
+            <li><strong>Modelo.</strong> Um modelo de árvores com reforço por gradiente (HistGradientBoosting, da biblioteca scikit-learn) para cada variável, treinado com dias medidos de 1961 a 2014. Chuva é estimada em duas partes: a chance de chover e o volume esperado em dia de chuva. Temperatura é estimada direto.</li>
+            <li><strong>Teste com dias escondidos.</strong> Dias medidos são escondidos do modelo, em blocos de 1 a 30 dias, e o modelo tenta reconstruí-los. O teste roda em 2015–2019 e em 2020–2025.</li>
+            <li><strong>Aprovação.</strong> A estação só recebe estimativas se, nos dois períodos, o erro do modelo for pelo menos 10% menor que o da média climática do mês, com pelo menos 100 dias testados. Para chuva, o modelo também precisa acertar 70% dos dias com chuva e errar o volume em até 20%.</li>
+            <li><strong>Preenchimento.</strong> Só as estações aprovadas são preenchidas, e só entre a primeira e a última medição, em lacunas de até 30 dias com pelo menos 2 vizinhos com dado no dia.</li>
+            <li><strong>Temperatura fora da faixa.</strong> Estimativas abaixo da mínima ou acima da máxima diárias já registradas no banco são descartadas e não entram no atlas.</li>
+          </ol>
+          <!-- Estes números são da última execução de preencher_ml.py (veja data/relatorios/ml_validacao_*.csv e a saída do script). Atualize-os quando reexecutar. -->
+          <p class="sobre-nota">Na última execução, 72 estações de chuva e 158 de temperatura foram aprovadas, de 1.219 estações avaliadas. Isso gerou 10.313 dias estimados de chuva e 20.498 de temperatura. A cobertura é baixa porque a maioria das estações não passa nos critérios.</p>
+          <table class="sobre-tabela">
+            <caption class="sr-only">Resultado da última execução do preenchimento</caption>
+            <thead><tr><th scope="col">Variável</th><th scope="col">Estações aprovadas</th><th scope="col">Dias estimados</th></tr></thead>
+            <tbody>
+              <tr><th scope="row">Precipitação</th><td>72 de 1.219</td><td>10.313</td></tr>
+              <tr><th scope="row">Temperatura</th><td>158 de 1.219</td><td>20.498</td></tr>
+            </tbody>
+          </table>
+        </div>
+        </details>
+      </div>
+
+      <div class="sobre-lateral">
+        <section aria-labelledby="s-fontes">
+          <h3 id="s-fontes">Fontes</h3>
+          <ul>
+            <li>Medições diárias: <a href="https://portal.inmet.gov.br/">Instituto Nacional de Meteorologia (INMET)</a>, estações convencionais e automáticas.</li>
+            <li>Classificação climática de Köppen-Geiger: <a href="https://doi.org/10.5194/hess-11-1633-2007">Peel et al. (2007)</a>, <a href="https://doi.org/10.1038/sdata.2018.214">Beck et al. (2018)</a> e <a href="https://doi.org/10.1038/s41597-023-02549-6">Beck et al. (2023)</a>.</li>
+            <li>Modelo de preenchimento: <a href="https://jmlr.org/papers/v12/pedregosa11a.html">Pedregosa et al. (2011)</a>, biblioteca scikit-learn.</li>
+            <li>Mapa: <a href="https://openfreemap.org/">OpenFreeMap</a>, <a href="https://www.openmaptiles.org/">OpenMapTiles</a> e <a href="https://www.openstreetmap.org/copyright">colaboradores do OpenStreetMap</a>.</li>
+          </ul>
+        </section>
+
+        <section class="sobre-mim" aria-labelledby="s-mim">
+          <h3 id="s-mim">Sobre mim</h3>
+          <p><strong>Gabriel Henrique Angelo</strong></p>
+          <p>Curso de Geografia, Universidade Estadual de Maringá (UEM)</p>
+          <p>Contato: <a href="mailto:angelo.henrique.gabriel@gmail.com">angelo.henrique.gabriel@gmail.com</a></p>
+          <ul class="redes">
+            <li><a href="https://github.com/ghangelo/Atlas-Climatico-do-Brasil" aria-label="GitHub: repositório do projeto"><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg><span>GitHub</span></a></li>
+            <li><a href="https://www.linkedin.com/in/gabrielhangelo" aria-label="LinkedIn de Gabriel Henrique Angelo"><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><rect x="0" y="0" width="24" height="24" rx="3" fill="currentColor"/><text x="12" y="17.5" text-anchor="middle" font-size="14" font-weight="700" font-family="Arial, sans-serif" fill="#fff">in</text></svg><span>LinkedIn</span></a></li>
+          </ul>
+        </section>
+      </div>
+    </div>
+    </section>
+
+  <footer class="projeto" id="projeto" aria-labelledby="projeto-t">
+    <div class="projeto-texto">
+      <h2 id="projeto-t">Sobre o projeto</h2>
+      <p class="lead">Este atlas é o projeto final do bootcamp Future Tech Leaders, de tecnologias espaciais, realizado pela Agência Espacial Brasileira (AEB) com o Programa das Nações Unidas para o Desenvolvimento (PNUD), o Istanbul International Center for Private Sector in Development (UNDP ICPSD) e o SDG AI Lab.</p>
+      <p>O bootcamp foi online e gratuito, com três meses de duração e foco em inteligência artificial, machine learning, sistemas de informação geográfica (SIG) e GeoAI. O atlas aplica esses temas a dados reais: as medições diárias do INMET, o preenchimento de falhas por um modelo de aprendizado de máquina e o mapeamento das séries completas de chuva e temperatura.</p>
+    </div>
+    <img class="projeto-parceiros" src="img/parceiros-projeto.png" alt="Parceiros do projeto: Future Tech Leaders, Agência Espacial Brasileira, SDG AI Lab, UNDP ICPSD e PNUD">
+    <dl class="projeto-fatos">
+      <div><dt>Tipo</dt><dd>Projeto final do bootcamp</dd></div>
+      <div><dt>Formato do bootcamp</dt><dd>Online e gratuito, três meses</dd></div>
+      <div><dt>Temas</dt><dd>Inteligência artificial, machine learning, SIG e GeoAI</dd></div>
+      <div><dt>Dados</dt><dd>Medições diárias do INMET, com estimativas por modelo</dd></div>
+    </dl>
+    <p class="projeto-link">Sobre o programa, na <a href="https://www.gov.br/aeb/pt-br/assuntos/noticias/inscricoes-abertas-para-o-bootcamp-de-tecnologias-espaciais-do-future-tech-leaders-programme">página da AEB</a>.</p>
+  </footer>
+</body>
+</html>

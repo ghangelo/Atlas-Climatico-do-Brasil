@@ -53,6 +53,32 @@ Abra http://127.0.0.1:8001/. O mapa precisa de internet para carregar os fundos.
 
 O site lê arquivos JSON de `atlas/static/api/`. Por isso ele também funciona sem servidor, no GitHub Pages: o workflow `.github/workflows/pages.yml` publica `atlas/static` a cada push na `main`.
 
+## Dados brutos do INMET
+
+O pipeline parte de séries **diárias** de cada estação, em CSV, no formato de exportação do BDMEP, o Banco de Dados Meteorológicos do INMET. Esses arquivos **não estão no repositório** (somam cerca de 350 MB). Antes de redistribuí-los, consulte os termos de uso do INMET.
+
+**Onde baixar:** no [BDMEP](https://bdmep.inmet.gov.br/) (descrição do serviço na [página do INMET](https://portal.inmet.gov.br/servicos/bdmep-dados-historicos)). Baixe **um CSV por estação**, com dados diários, o período completo de cada uma e as quatro variáveis: precipitação total, temperatura máxima, temperatura média e temperatura mínima. A interface do INMET muda de tempos em tempos, então o que vale é o formato descrito abaixo. Os pacotes anuais em ZIP da página "Dados Históricos" trazem dados horários, em outro formato, e o `criar_fonte.py` não os lê.
+
+**Onde guardar:** a pasta define o tipo da estação.
+
+```text
+data/raw/inmet/
+├── convencionais/   um CSV por estação, ex.: 82014_d796e46c880b.csv
+└── automaticas/     um CSV por estação, ex.: dados_A001_D_2000-05-06_2025-12-31.csv
+```
+
+**Formato que o `criar_fonte.py` espera:**
+
+- Um arquivo `.csv` por estação, em `convencionais/` ou `automaticas/`. O nome do arquivo não importa: o código da estação vem do cabeçalho.
+- Cabeçalho de metadados: `Nome`, `Codigo Estacao`, `Latitude`, `Longitude`, `Altitude`, `Situacao`, `Data Inicial`, `Data Final` e `Periodicidade da Medicao: Diaria`.
+- Uma linha de colunas que começa com `Data Medicao;` e traz, nesta ordem de nomes:
+  - convencionais: `PRECIPITACAO TOTAL, DIARIO(mm)`, `TEMPERATURA MAXIMA, DIARIA(°C)`, `TEMPERATURA MEDIA COMPENSADA, DIARIA(°C)`, `TEMPERATURA MINIMA, DIARIA(°C)`;
+  - automáticas: os mesmos nomes com `(AUT)`, e a média sem "COMPENSADA": `TEMPERATURA MEDIA, DIARIA (AUT)(°C)`.
+- Depois, um dia por linha: `AAAA-MM-DD;valor;valor;valor;valor;`. O separador é `;`, a vírgula é o separador decimal e dia sem medição vem como `null`.
+- Arquivos com a linha `Data Medicao;` **sem nomes de coluna** são pulados, porque a ordem das colunas não é conhecida. O script lista cada arquivo pulado na saída.
+
+**Conferir:** rode `python pipeline/criar_fonte.py`. Ele imprime quantos arquivos leu de cada tipo, quantas estações e dias gravou e quais arquivos pulou. O projeto partiu de 626 arquivos de estações convencionais e 651 de automáticas, com séries até 31/12/2025. Desses, 56 foram pulados por não terem nomes de coluna (54 automáticas e 2 convencionais), e duas automáticas (A707 e A766) foram excluídas por erro de registro de chuva.
+
 ## Como os dados são montados
 
 ```mermaid
@@ -71,7 +97,7 @@ flowchart LR
 
 Para reproduzir, na raiz do projeto e nesta ordem (precisa de NumPy, pandas e scikit-learn, com as versões em `requirements-processamento.txt`):
 
-1. `python pipeline/criar_fonte.py` cria `data/fonte.db` a partir de `data/raw/inmet/`.
+1. `python pipeline/criar_fonte.py` cria `data/fonte.db` a partir de `data/raw/inmet/` (veja [Dados brutos do INMET](#dados-brutos-do-inmet)).
 2. `python pipeline/preencher_ml.py precipitacao` e `python pipeline/preencher_ml.py temperatura` geram `data/preenchido.db`.
 3. `python -m pipeline.preparar_dados` gera `data/combinado.db` (use `--substituir` para recriar).
 4. `python -m pipeline.janelas_completas` gera `data/atlas.db` (use `--substituir` para recriar).
